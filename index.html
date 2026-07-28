@@ -32,7 +32,8 @@
   label.f{display:block;font-size:11.5px;color:var(--muted);margin:8px 0 2px;}
   .req-mark{color:var(--req);font-size:10px;font-weight:bold;border:1px solid #e6b3aa;
     background:#fbe9e6;border-radius:3px;padding:0 4px;margin-left:6px;vertical-align:middle;}
-  th .req-mark{margin-left:3px;padding:0 3px;}
+  .sign-tbl th{text-align:center;white-space:nowrap;}
+  th .req-mark{display:block;width:fit-content;margin:2px auto 0;padding:0 3px;font-size:9px;}
   input,select{width:100%;padding:6px 8px;border:1px solid #c4ced8;border-radius:6px;font-size:13px;background:#fff;}
   .row{display:flex;gap:8px;}.row>div{flex:1;}
   table{border-collapse:collapse;width:100%;font-size:12.5px;}
@@ -128,7 +129,7 @@
       <h2>看板リスト（現地実測で補完）</h2>
       <div class="body" style="max-height:420px;overflow:auto;padding:8px">
         <table class="sign-tbl">
-          <thead><tr><th style="width:26px"></th><th>名称</th><th style="width:96px">種別</th><th style="width:64px">壁面</th><th style="width:64px">H(mm)<span class="req-mark">必須</span></th><th style="width:64px">W(mm)<span class="req-mark">必須</span></th><th style="width:44px">数<span class="req-mark">必須</span></th></tr></thead>
+          <thead><tr><th style="width:26px"></th><th>名称</th><th style="width:96px">種別</th><th style="width:64px">壁面</th><th style="width:64px">H(mm)<span class="req-mark">必須</span></th><th style="width:64px">W(mm)<span class="req-mark">必須</span></th><th style="width:52px">数<span class="req-mark">必須</span></th></tr></thead>
           <tbody id="signBody"></tbody>
         </table>
         <p class="src" style="margin:8px 2px 0">面積は H×W から自動計算。壁面は面積の3/10基準の突合に使用。</p>
