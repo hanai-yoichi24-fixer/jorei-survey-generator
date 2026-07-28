@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>条例調査表ジェネレーター｜屋外広告物</title>
+<style>
+  :root{
+    --navy:#1a3a5c;--navy2:#24507d;--line:#d7dee6;--bg:#eef2f6;
+    --ok:#1a7a4c;--okbg:#e8f5ee;--warn:#a86400;--warnbg:#fdf4e3;
+    --req:#b5361f;--reqbg:#fbe9e6;--muted:#6a7787;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;margin:0;
+    background:var(--bg);color:#243140;line-height:1.65;font-size:14px;}
+  .app{max-width:1180px;margin:0 auto;padding:20px;}
+  header.top{background:linear-gradient(100deg,var(--navy),var(--navy2));color:#fff;
+    border-radius:10px;padding:18px 24px;display:flex;align-items:center;gap:14px;}
+  header.top h1{margin:0;font-size:19px;}
+  header.top .tag{font-size:12px;opacity:.85;}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0;}
+  button{font-family:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--navy);
+    background:#fff;color:var(--navy);padding:9px 16px;font-size:13.5px;font-weight:bold;}
+  button.primary{background:var(--navy);color:#fff;}
+  button.primary:hover{background:var(--navy2);}
+  button.ghost{border-color:#c4ced8;color:#455;font-weight:normal;}
+  button:hover{border-color:var(--navy2);}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .card h2{background:#eef2f6;margin:0;padding:10px 14px;font-size:13.5px;color:var(--navy);border-bottom:1px solid var(--line);}
+  .card .body{padding:12px 14px;}
+  label.f{display:block;font-size:11.5px;color:var(--muted);margin:8px 0 2px;}
+  input,select{width:100%;padding:6px 8px;border:1px solid #c4ced8;border-radius:6px;font-size:13px;background:#fff;}
+  .row{display:flex;gap:8px;}.row>div{flex:1;}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;}
+  th,td{border:1px solid #dbe2ea;padding:5px 8px;text-align:left;vertical-align:top;}
+  th{background:#eef2f6;color:var(--navy);}
+  .sign-tbl input,.sign-tbl select{padding:3px 5px;font-size:12px;}
+  .sign-tbl td{padding:3px 5px;}
+  .delrow{border:none;background:none;color:#b5361f;font-weight:bold;padding:0 4px;font-size:15px;}
+  .j{display:inline-block;font-weight:bold;border-radius:4px;padding:1px 8px;font-size:11.5px;white-space:nowrap;}
+  .j.ok{background:var(--okbg);color:var(--ok);}
+  .j.warn{background:var(--warnbg);color:var(--warn);}
+  .j.req{background:var(--reqbg);color:var(--req);}
+  .j.na{background:#eee;color:#889;}
+  .survey{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;}
+  .survey .hd{background:var(--navy);color:#fff;padding:11px 15px;font-size:15px;font-weight:bold;}
+  .survey .hd.sub{background:var(--navy2);}
+  .meta .k{background:#f6f8fa;font-weight:bold;width:130px;color:var(--navy);}
+  .req-tag{font-weight:bold;color:var(--req);}
+  .secttl td{background:#f0f3f7;font-weight:bold;color:var(--navy);}
+  .grp td:first-child{background:#fafcff;font-weight:bold;}
+  .sub-row td{background:#f6f9fc;font-weight:bold;}
+  .amt{text-align:right;font-variant-numeric:tabular-nums;}
+  .src{font-size:11px;color:#7a8aa0;}
+  .foot{font-size:11px;color:#8593a5;padding:10px 15px;border-top:1px solid var(--line);background:#fafbfc;}
+  .hint{background:#fff8e8;border:1px solid #e8d9a8;border-radius:8px;padding:10px 14px;font-size:12px;color:#5a4a20;margin-bottom:14px;}
+  .legend{font-size:11.5px;color:#667;margin:8px 0;}
+  .legend .j{margin-right:6px;}
+  @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  @media print{
+    body{background:#fff;}.toolbar,.hint,header.top .tag,.card.input-col,.legend{display:none!important;}
+    .grid{grid-template-columns:1fr;}.app{max-width:none;padding:0;}
+    header.top{background:#fff;color:#000;border:none;padding:0 0 8px;}
+    .survey{border:none;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>条例調査表ジェネレーター</h1>
+      <div class="tag">屋外広告物申請｜物件情報と看板から、東京都のしおり・区の景観条例に照らして調査表ドラフトを自動生成</div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <button class="primary" onclick="generate()">▶ 条例調査表を生成</button>
+    <button class="ghost" onclick="loadPreset()">丸亀製麺 新宿御苑前店を読込</button>
+    <button class="ghost" onclick="addSign()">＋ 看板を追加</button>
+    <button class="ghost" onclick="window.print()">🖶 印刷 / PDF保存</button>
+    <button class="ghost" onclick="clearAll()">クリア</button>
+  </div>
+
+  <div class="hint">
+    規制値は<b>東京都屋外広告物のしおり（2025年）</b>および<b>新宿区景観まちづくり条例の手引き（R5）</b>に基づきます。
+    入力データはこのブラウザ内だけで処理され、サーバーには送信・保存されません（社外秘データの取り扱いに配慮）。
+    <b>「要確認」＝公開文書だけでは決まらず、行政・現地確認を人が行う箇所</b>です。判定はドラフトであり、最終確認は各法令をご参照ください。
+  </div>
+
+  <div class="grid">
+    <div class="card input-col">
+      <h2>物件情報</h2>
+      <div class="body">
+        <label class="f">物件名</label><input id="name" placeholder="例）丸亀製麺 新宿御苑前店">
+        <label class="f">住所</label><input id="addr" placeholder="例）東京都新宿区新宿1丁目4-13 ○○ビル 1F">
+        <div class="row">
+          <div><label class="f">用途地域</label>
+            <select id="youto">
+              <option>商業地域</option><option>近隣商業地域</option>
+              <option>準工業地域</option><option>工業地域</option>
+              <option>第一種住居地域</option><option>第二種住居地域</option>
+              <option>準住居地域</option><option>第一種低層住居専用地域</option>
+            </select></div>
+          <div><label class="f">建物高さ(m)</label><input id="height" type="number" value="9"></div>
+        </div>
+        <div class="row">
+          <div><label class="f">景観特別地区</label>
+            <select id="keikan">
+              <option>該当なし</option>
+              <option>文化財庭園等景観形成特別地区</option>
+              <option>水辺景観形成特別地区</option>
+            </select></div>
+          <div><label class="f">道路占用（袖看板）</label>
+            <select id="senyou"><option>該当なし</option><option>未取得</option><option>取得済</option></select></div>
+        </div>
+        <div class="row">
+          <div><label class="f">申請先（窓口）</label><input id="madoguchi" placeholder="例）新宿区みどり土木部土木管理課 占用係"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card input-col">
+      <h2>看板リスト（現地実測で補完）</h2>
+      <div class="body" style="max-height:420px;overflow:auto;padding:8px">
+        <table class="sign-tbl">
+          <thead><tr><th style="width:26px"></th><th>名称</th><th style="width:96px">種別</th><th style="width:64px">壁面</th><th style="width:58px">H(mm)</th><th style="width:58px">W(mm)</th><th style="width:40px">数</th></tr></thead>
+          <tbody id="signBody"></tbody>
+        </table>
+        <p class="src" style="margin:8px 2px 0">面積は H×W から自動計算。壁面は面積の3/10基準の突合に使用。</p>
+      </div>
+    </div>
+  </div>
+
+  <p class="legend">判定の凡例：
+    <span class="j ok">適合</span>基準を満たす
+    <span class="j warn">要確認</span>公開文書では決まらず人的確認
+    <span class="j req">要是正</span>基準超過</p>
+
+  <div id="output"></div>
+</div>
+
+<script>
+const KB = {
+  wallHeightLimit:(y)=> /第一種住居|第二種住居|準住居/.test(y)?33:52,
+  wallAreaCap:(y)=> /商業地域/.test(y)?100:50,
+  jikayoExempt:(y)=> /低層住居|中高層住居|田園|風致|特別緑地|文教/.test(y)?5:10,
+  ratio310:0.30, soryoRatio:0.60, roadOut:1.0, bldgOut:1.5, interval:5.0
+};
+const TYPES=["壁面看板","広告幕","突出看板","広告塔・広告板","屋上広告","立看板等"];
+const WALLTYPES=["正面","北","東","西","南","—"];
+const WALL_BASE={"正面":{h:20000,w:5000},"北":{h:20000,w:10801},"東":{h:20000,w:10531},
+  "西":{h:20000,w:8000},"南":{h:20000,w:8000}};
+
+let SIGNS=[];
+const r2=x=>Math.round(x*100)/100;
+const area=s=>(+s.h)*(+s.w)/1e6;
+const areaTot=s=>area(s)*(+s.n);
+
+const PRESET={
+  name:"丸亀製麺 新宿御苑前店",
+  addr:"東京都新宿区新宿1丁目4-13 溝呂木第2ビル 1F",
+  youto:"商業地域", height:9, keikan:"文化財庭園等景観形成特別地区",
+  senyou:"未取得", madoguchi:"新宿区みどり土木部土木管理課 占用係",
+  signs:[
+    {name:"突出広告物「自家製麺 釜揚うどん 他」",type:"突出看板",wall:"北",h:600,w:2000,n:2},
+    {name:"壁面広告板「讃岐 釜揚げうどん 丸亀製麺」",type:"壁面看板",wall:"正面",h:900,w:2500,n:1},
+    {name:"壁面広告板「讃岐 釜揚げうどん 他」",type:"壁面看板",wall:"北",h:600,w:2000,n:1},
+    {name:"壁面広告板 メニュー木札",type:"壁面看板",wall:"東",h:600,w:240,n:6},
+    {name:"のれん「うどん・天ぷらお持ち帰り」",type:"壁面看板",wall:"東",h:350,w:2500,n:2},
+    {name:"ガラス面シート「出口」",type:"壁面看板",wall:"東",h:200,w:650,n:1},
+    {name:"木札「釜揚げうどん」",type:"壁面看板",wall:"東",h:1400,w:500,n:1},
+    {name:"のれん「うどん・天ぷらお持ち帰り」",type:"壁面看板",wall:"東",h:350,w:1950,n:1},
+    {name:"メニューパネル",type:"壁面看板",wall:"正面",h:1080,w:780,n:1},
+    {name:"ガラス面シート「入口」",type:"壁面看板",wall:"正面",h:300,w:150,n:1},
+    {name:"広告幕（メニュー）",type:"広告幕",wall:"正面",h:1550,w:810,n:1},
+    {name:"のれん「うどん・天ぷらお持ち帰り」",type:"壁面看板",wall:"北",h:350,w:2450,n:1},
+    {name:"置き看板「うどん弁当直売店」",type:"立看板等",wall:"—",h:1555,w:555,n:2},
+    {name:"広告幕「釜揚げうどん 他」",type:"広告幕",wall:"北",h:2000,w:1180,n:1}
+  ]
+};
+
+function opt(list,sel){return list.map(v=>`<option${v===sel?' selected':''}>${v}</option>`).join("");}
+function drawSigns(){
+  document.getElementById("signBody").innerHTML=SIGNS.map((s,i)=>`<tr>
+    <td><button class="delrow" onclick="delSign(${i})" title="削除">×</button></td>
+    <td><input value="${(s.name||'').replace(/"/g,'&quot;')}" oninput="upd(${i},'name',this.value)"></td>
+    <td><select onchange="upd(${i},'type',this.value)">${opt(TYPES,s.type)}</select></td>
+    <td><select onchange="upd(${i},'wall',this.value)">${opt(WALLTYPES,s.wall)}</select></td>
+    <td><input type="number" value="${s.h}" oninput="upd(${i},'h',this.value)"></td>
+    <td><input type="number" value="${s.w}" oninput="upd(${i},'w',this.value)"></td>
+    <td><input type="number" value="${s.n}" oninput="upd(${i},'n',this.value)"></td>
+  </tr>`).join("");
+}
+function upd(i,k,v){SIGNS[i][k]=v;}
+function delSign(i){SIGNS.splice(i,1);drawSigns();}
+function addSign(){SIGNS.push({name:"",type:"壁面看板",wall:"正面",h:0,w:0,n:1});drawSigns();}
+function clearAll(){SIGNS=[];drawSigns();["name","addr","madoguchi"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("output").innerHTML="";}
+function loadPreset(){
+  document.getElementById("name").value=PRESET.name;
+  document.getElementById("addr").value=PRESET.addr;
+  document.getElementById("youto").value=PRESET.youto;
+  document.getElementById("height").value=PRESET.height;
+  document.getElementById("keikan").value=PRESET.keikan;
+  document.getElementById("senyou").value=PRESET.senyou;
+  document.getElementById("madoguchi").value=PRESET.madoguchi;
+  SIGNS=PRESET.signs.map(s=>({...s}));drawSigns();generate();
+}
+
+const J={ok:'<span class="j ok">適合</span>',warn:'<span class="j warn">要確認</span>',
+  req:'<span class="j req">要是正</span>',na:'<span class="j na">—</span>'};
+
+function generate(){
+  const g=id=>document.getElementById(id).value;
+  const youto=g("youto"),keikan=g("keikan"),senyou=g("senyou"),
+    H=+g("height")||0,name=g("name")||"（物件名未入力）",addr=g("addr"),madoguchi=g("madoguchi")||"—";
+  if(SIGNS.length===0){document.getElementById("output").innerHTML=
+    `<div class="hint" style="margin-top:16px">看板が未入力です。「丸亀製麺…を読込」または「＋看板を追加」で入力してください。</div>`;return;}
+
+  const grand=r2(SIGNS.reduce((a,s)=>a+areaTot(s),0));
+  const exemptCap=KB.jikayoExempt(youto);
+  const needApply=grand>exemptCap;
+  const soryoCap=KB.wallAreaCap(youto);
+  const hLimit=KB.wallHeightLimit(youto);
+  const heightOK=H<=hLimit;
+
+  const usedWalls=[...new Set(SIGNS.map(s=>s.wall))].filter(w=>WALL_BASE[w]);
+  const wallRows=usedWalls.map(wk=>{
+    const b=WALL_BASE[wk],basis=b.h*b.w/1e6,cap=r2(basis*KB.ratio310);
+    const sum=r2(SIGNS.filter(s=>s.wall===wk).reduce((a,s)=>a+areaTot(s),0));
+    return {wk,basis:r2(basis),cap,sum,ok:sum<=cap};
+  });
+  const wall310ok=wallRows.every(w=>w.ok);
+  const has=t=>SIGNS.some(s=>s.type===t);
+
+  const meta=`<table class="meta">
+    <tr><td class="k">物件名</td><td colspan="3">${name}</td></tr>
+    <tr><td class="k">住所</td><td colspan="3">${addr||"—"}</td></tr>
+    <tr><td class="k">用途地域</td><td>${youto}</td><td class="k">建物高さ</td>
+        <td>${H} m（上端上限 ${hLimit}m ⇒ ${heightOK?J.ok:J.req}）</td></tr>
+    <tr><td class="k">屋外広告物申請</td><td colspan="3"><span class="req-tag">【${needApply?'要':'不要'}】</span>
+        区域区分：許可区域／申請先：${madoguchi}
+        <span class="src">引用：東京都屋外広告物のしおり（2025）</span></td></tr>
+    <tr><td class="k">景観申請関連</td><td colspan="3"><span class="req-tag">【${keikan==='該当なし'?'不要':'要'}】</span>
+        区域区分：${keikan}${keikan==='該当なし'?'':'／屋外広告物申請時は事前協議が必要（許可申請の15日前まで・景観まちづくり課）'}
+        <span class="src">引用：新宿区景観まちづくり条例に基づく届出等の手続き（R5）</span></td></tr>
+    <tr><td class="k">道路占用</td><td colspan="3"><span class="req-tag">【${senyou==='該当なし'?'不要':'要'}】</span>
+        許可書：【${senyou==='取得済'?'有':(senyou==='未取得'?'無':'—')}】
+        ${senyou==='未取得'?'※袖看板が道路境界線を越境の可能性。要行政確認':''}</td></tr>
+  </table>`;
+
+  const kyotsu=`<table>
+    <tr class="secttl"><td colspan="3">屋外広告物条例【共通基準】</td></tr>
+    <tr><td class="k" style="width:190px">適用除外（自家用広告物）</td>
+        <td>合計面積 ${exemptCap}㎡ 以下 ⇒ 実測合計 <b>${grand}㎡</b></td>
+        <td>${needApply?'<span class="j req">超過＝申請要</span>':J.ok}</td></tr>
+    <tr><td class="k">総量規制（${/商業/.test(youto)?'商業系':youto}）</td>
+        <td>≦ ${soryoCap}㎡（高さ10m超の建物が対象）／ 合計 ${grand}㎡</td>
+        <td>${grand<=soryoCap?J.ok:J.warn}</td></tr>
+    <tr><td class="k">色彩制限</td><td>原則として蛍光塗料・蛍光フィルムは使用不可</td><td>${J.warn}</td></tr>
+    <tr><td class="k">その他（光源・点滅等）</td><td>景観風致を害するおそれ／公衆に危害を及ぼすおそれのある広告物は不可</td><td>${J.warn}</td></tr>
+  </table>`;
+
+  let kob=`<table><tr class="secttl"><td style="width:120px">種別</td><td>個別基準（詳細）</td><td style="width:88px">判定</td></tr>`;
+  if(has("壁面看板")){kob+=`
+    <tr class="grp"><td rowspan="4">壁面看板</td><td>面積：表示面積の合計 ≦ 当該壁面面積 × 3/10（下表で壁面別に判定）</td><td>${wall310ok?J.ok:J.req}</td></tr>
+    <tr><td>高さ：GL⇔上端 ≦ ${hLimit}m</td><td>${heightOK?J.ok:J.req}</td></tr>
+    <tr><td>壁面の外郭線から突出しない／窓・開口部を塞がない</td><td>${J.ok}</td></tr>
+    <tr><td>一壁面に内容が同じ広告物：各広告物の間隔を5m以上離す</td><td>${J.warn}</td></tr>`;}
+  if(has("広告幕")){kob+=`
+    <tr class="grp"><td rowspan="2">広告幕</td><td>面積 ≦ 当該壁面面積 × 3/10 ／ 高さ GL⇔上端 ≦ ${hLimit}m</td><td>${J.ok}</td></tr>
+    <tr><td>窓・開口部を塞がない（非常用進入口・避難器具の窓等以外はこの限りでない）</td><td>${J.ok}</td></tr>`;}
+  if(has("突出看板")){kob+=`
+    <tr class="grp"><td rowspan="3">突出看板</td><td>高さ：GL⇔上端 ≦ 52m ／ 上端が壁面の上端を超えない</td><td>${J.ok}</td></tr>
+    <tr><td>道路境界線からの出幅 ≦ 1m かつ 建築物からの出幅 ≦ 1.5m</td><td>${senyou==='未取得'?J.warn:J.ok}</td></tr>
+    <tr><td>下端：歩道上 GL⇔3.5m以上（出幅0.5m以下は2.5m以上）／構造体を露出させない</td><td>${J.ok}</td></tr>`;}
+  if(has("広告塔・広告板")){kob+=`
+    <tr class="grp"><td>広告塔・広告板</td><td>上端 ≦ 13m（商業地域の自家用等）／占用時は出幅・下端基準</td><td>${J.warn}</td></tr>`;}
+  if(has("屋上広告")){kob+=`
+    <tr class="grp"><td>屋上広告</td><td>木造：上端≦GL10m／RC・鉄骨：設置箇所高さの2/3かつ上端≦52m／壁面直上垂直面から突出しない</td><td>${J.warn}</td></tr>`;}
+  if(has("立看板等")){kob+=`
+    <tr class="grp"><td>立看板等</td><td>置き看板等：道路占用・設置位置の可否は現地/行政確認</td><td>${J.warn}</td></tr>`;}
+  kob+=`</table>`;
+
+  let rows="";
+  usedWalls.forEach(wk=>{
+    const w=wallRows.find(r=>r.wk===wk);
+    rows+=`<tr class="sub-row"><td colspan="3">${wk}壁面 ／ 基準面積 ${w.basis}㎡ ・ 許可基準(3/10) ${w.cap}㎡</td>
+      <td class="amt">小計 ${w.sum}㎡</td><td>${w.ok?J.ok:J.req}</td></tr>`;
+    SIGNS.filter(s=>s.wall===wk).forEach(s=>{
+      rows+=`<tr><td>${s.name||'(名称未入力)'}</td><td>${s.type}</td><td class="amt">${s.h}×${s.w}</td>
+        <td class="amt">${r2(area(s))}㎡ ×${s.n} = ${r2(areaTot(s))}㎡</td><td>${J.ok}</td></tr>`;
+    });
+  });
+  const other=SIGNS.filter(s=>!WALL_BASE[s.wall]);
+  if(other.length){rows+=`<tr class="sub-row"><td colspan="4">その他（壁面外・置き看板等）</td><td></td></tr>`;
+    other.forEach(s=>{rows+=`<tr><td>${s.name||'(名称未入力)'}</td><td>${s.type}</td><td class="amt">${s.h}×${s.w}</td>
+      <td class="amt">${r2(area(s))}㎡ ×${s.n} = ${r2(areaTot(s))}㎡</td><td>${J.warn}</td></tr>`;});}
+
+  const areaTable=`<table>
+    <tr class="secttl"><td>広告物</td><td style="width:96px">種別</td><td style="width:100px">H×W(mm)</td>
+        <td style="width:150px">面積</td><td style="width:70px">判定</td></tr>
+    ${rows}
+    <tr class="sub-row"><td colspan="3">屋外広告物 合計面積</td><td class="amt">${grand}㎡</td>
+        <td>${needApply?'<span class="j req">適用除外(10㎡)超</span>':J.ok}</td></tr>
+  </table>`;
+
+  const bodyHtml=`${meta}${kyotsu}${kob}
+    <div class="hd sub">■ 面積計算表（実測寸法から自動算定）</div>${areaTable}`;
+  const cnt=c=>(bodyHtml.match(new RegExp('class="j '+c+'"','g'))||[]).length;
+
+  document.getElementById("output").innerHTML=`
+    <div class="survey" style="margin-top:16px">
+      <div class="hd">【条例調査表】${name}　<span style="font-weight:normal;font-size:12px;opacity:.85">自動生成ドラフト（要人的レビュー）</span></div>
+      ${bodyHtml}
+      <div class="foot">
+        自動判定：適合 ${cnt('ok')} 件／要確認 ${cnt('warn')} 件／要是正 ${cnt('req')} 件。
+        「要確認」は行政・現地確認を人が行う箇所です。本ドラフトは各法令の最終確認を前提とします。
+      </div>
+    </div>`;
+}
+drawSigns();
+</script>
+</body>
+</html>
