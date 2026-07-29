@@ -61,6 +61,12 @@
   .hint{background:#fff8e8;border:1px solid #e8d9a8;border-radius:8px;padding:10px 14px;font-size:12px;color:#5a4a20;margin-bottom:14px;}
   .legend{font-size:11.5px;color:#667;margin:8px 0;}
   .legend .j{margin-right:6px;}
+  .st{font-size:11px;font-weight:bold;border-radius:4px;padding:1px 7px;white-space:nowrap;}
+  .st.ok{background:var(--okbg);color:var(--ok);}
+  .st.warn{background:var(--warnbg);color:var(--warn);}
+  .st.err{background:var(--reqbg);color:var(--req);}
+  .srclink{color:#1a6fbf;word-break:break-all;}
+  .srcnote{font-size:11px;color:var(--warn);margin-top:4px;}
   @media(max-width:900px){.grid{grid-template-columns:1fr;}}
   @media print{
     body{background:#fff;}.toolbar,.hint,header.top .tag,.card.input-col,.legend{display:none!important;}
@@ -311,7 +317,9 @@ function generate(){
         <td>${needApply?'<span class="j req">適用除外(10㎡)超</span>':J.ok}</td></tr>
   </table>`;
 
-  const bodyHtml=`${meta}${kyotsu}${kob}
+  const bodyHtml=`<div class="hd sub" style="margin-top:0">■ 照合に使った情報ソース（住所から自動取得）</div>
+    <div id="srcPanel"><table><tr><td class="foot" style="border-top:none">住所から適用資料を判定し、取得中…</td></tr></table></div>
+    ${meta}${kyotsu}${kob}
     <div class="hd sub">■ 面積計算表（実測寸法から自動算定）</div>${areaTable}`;
   const cnt=c=>(bodyHtml.match(new RegExp('class="j '+c+'"','g'))||[]).length;
 
@@ -324,6 +332,46 @@ function generate(){
         「要確認」は行政・現地確認を人が行う箇所です。本ドラフトは各法令の最終確認を前提とします。
       </div>
     </div>`;
+  loadSources({addr:addr,youto:youto,keikan:keikan,senyou:senyou});
+}
+
+function statusCls(s){if(/OK/.test(s))return"ok";if(/不可|失敗/.test(s))return"err";return"warn";}
+function srcTable(list,live,meta){
+  const rows=list.map(s=>{
+    const link=s.url?`<a class="srclink" href="${s.url}" target="_blank" rel="noopener">${s.name}</a>`:`${s.name}`;
+    const st=s.status||(s.url?"（リンクのみ）":"未登録");
+    const ct=s.contentType?`<div class="src">${String(s.contentType).split(";")[0]}</div>`:"";
+    return `<tr><td>${s.category||"—"}</td><td>${link}<div class="src">${s.issuer||""}</div></td>
+      <td>${s.refs||""}</td><td><span class="st ${statusCls(st)}">${st}</span>${ct}</td></tr>`;
+  }).join("");
+  const when=live&&meta&&meta.fetchedAt?new Date(meta.fetchedAt).toLocaleString("ja-JP"):"";
+  const head=live?`実際にWebから取得して存在を確認しました（${when}）`:`オフライン表示（リンクのみ）。存在確認は公開URL上で実行されます`;
+  const gap=list.some(s=>!s.url)?`<div class="srcnote">※「未登録」は当ツールにまだ登録がない資料です。この自治体を扱うには、該当条例・しおり相当文書の登録が必要です（自治体差分は設計フェーズ）。</div>`:"";
+  return `<table><tr class="secttl"><td style="width:130px">区分</td><td>資料名 / 発行主体</td><td>主な参照箇所</td><td style="width:120px">取得状況</td></tr>${rows}</table>
+    <div class="foot" style="border-top:none">${head}。規制値そのものの自動抽出（LLM）は次段階（要APIキー・人的検証）で、現在の判定は登録済み基準に基づきます。${gap}</div>`;
+}
+function resolveSourcesClient(p){
+  const addr=p.addr||"",keikan=p.keikan||"",senyou=p.senyou||"";
+  const muni=(addr.replace(/^(東京都|北海道|京都府|大阪府|.{2,3}?県)/,"").match(/^(.+?[市区町村])/)||[])[1]||"";
+  const TOKYO23=["千代田区","中央区","港区","新宿区","文京区","台東区","墨田区","江東区","品川区","目黒区","大田区","世田谷区","渋谷区","中野区","杉並区","豊島区","北区","荒川区","板橋区","練馬区","足立区","葛飾区","江戸川区"];
+  const shiori={category:"屋外広告物（都条例）",name:"東京都屋外広告物のしおり（2025年）",issuer:"東京都 都市整備局",url:"https://www.toshiseibi.metro.tokyo.lg.jp/documents/d/toshiseibi/pdf_kenchiku_koukoku_pdf_kou_2025siori",refs:"適用除外・総量規制・色彩・個別基準（面積/高さ/出幅/個数）"};
+  const shinjuku={category:"景観（区条例）",name:"新宿区景観まちづくり条例に基づく届出等の手続き（屋外広告物編・R5）",issuer:"新宿区 景観・まちづくり課",url:"https://www.city.shinjuku.lg.jp/content/000414285.pdf",refs:"区域区分の判定、事前協議要件"};
+  const out=[];
+  if(/^東京都/.test(addr)||TOKYO23.includes(muni)){
+    if(muni==="八王子市")out.push({category:"屋外広告物（市条例）",name:"八王子市屋外広告物条例",issuer:"八王子市 まちなみ景観課",url:null,refs:"中核市。市条例（東京都しおりは非適用）"});
+    else if(muni==="町田市")out.push({category:"屋外広告物（市条例）",name:"町田市屋外広告物条例",issuer:"町田市 地区街づくり課",url:null,refs:"景観行政団体。R6.10.1施行"});
+    else{out.push(shiori);if(muni==="新宿区")out.push(shinjuku);else if(keikan&&keikan!=="該当なし")out.push({category:"景観（区条例）",name:muni+"の景観条例（屋外広告物）",issuer:muni,url:null,refs:"区域区分・事前協議（当区資料は未登録）"});}
+  }else if(addr){out.push({category:"屋外広告物（条例）",name:(muni||"該当自治体")+"の屋外広告物条例",issuer:muni||"該当自治体",url:null,refs:"当自治体の条例（未登録）"});if(keikan&&keikan!=="該当なし")out.push({category:"景観（条例）",name:(muni||"該当自治体")+"の景観条例",issuer:muni||"該当自治体",url:null,refs:"景観計画区域・事前協議（未登録）"});}
+  else out.push({category:"—",name:"住所から自治体を特定できません",issuer:"—",url:null,refs:"住所を入力してください"});
+  if(senyou&&senyou!=="該当なし")out.push({category:"道路占用",name:"道路占用許可（道路管理者）",issuer:(muni||"所管自治体")+" 道路管理担当",url:null,refs:"袖看板等が道路を占用する場合。窓口確認が必要"});
+  return out;
+}
+async function loadSources(p){
+  const el=document.getElementById("srcPanel");if(!el)return;
+  let data=null;
+  try{const r=await fetch("/api/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});if(r.ok)data=await r.json();}catch(e){}
+  if(data&&data.sources)el.innerHTML=srcTable(data.sources,true,data);
+  else el.innerHTML=srcTable(resolveSourcesClient(p),false);
 }
 drawSigns();
 </script>
