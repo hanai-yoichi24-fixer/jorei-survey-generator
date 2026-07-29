@@ -88,7 +88,6 @@
   <div class="toolbar">
     <button class="primary" onclick="generate()">▶ 条例調査表を生成</button>
     <button class="ghost" onclick="loadPreset()">丸亀製麺 新宿御苑前店を読込</button>
-    <button class="ghost" onclick="addSign()">＋ 看板を追加</button>
     <button class="ghost" onclick="window.print()">🖶 印刷 / PDF保存</button>
     <button class="ghost" onclick="clearAll()">クリア</button>
     <button class="ghost" onclick="toggleRegistry()">📚 資料台帳</button>
@@ -170,6 +169,9 @@
           <tbody id="signBody"></tbody>
         </table>
         <p class="src" style="margin:8px 2px 0">面積は H×W から自動計算。壁面は面積の3/10基準の突合に使用。</p>
+      </div>
+      <div style="padding:8px 14px;border-top:1px solid var(--line)">
+        <button class="ghost" onclick="addSign()" style="font-size:12.5px;padding:6px 12px">＋ 看板を追加</button>
       </div>
     </div>
   </div>
