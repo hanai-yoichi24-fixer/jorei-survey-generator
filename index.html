@@ -69,7 +69,7 @@
   .srcnote{font-size:11px;color:var(--warn);margin-top:4px;}
   @media(max-width:900px){.grid{grid-template-columns:1fr;}}
   @media print{
-    body{background:#fff;}.toolbar,.hint,header.top .tag,.card.input-col,.legend,#registry{display:none!important;}
+    body{background:#fff;}.toolbar,.hint,header.top .tag,.card.input-col,.legend,#registry,#history{display:none!important;}
     .grid{grid-template-columns:1fr;}.app{max-width:none;padding:0;}
     header.top{background:#fff;color:#000;border:none;padding:0 0 8px;}
     .survey{border:none;}
@@ -86,8 +86,8 @@
   </header>
 
   <div class="toolbar">
-    <button class="primary" onclick="generate()">▶ 条例調査表を生成</button>
-    <button class="ghost" onclick="loadPreset()">丸亀製麺 新宿御苑前店を読込</button>
+    <button class="primary" onclick="generate(true)">▶ 条例調査表を生成</button>
+    <button class="ghost" onclick="openHistory()">🕘 履歴</button>
     <button class="ghost" onclick="window.print()">🖶 印刷 / PDF保存</button>
     <button class="ghost" onclick="clearAll()">クリア</button>
     <button class="ghost" onclick="toggleRegistry()">📚 資料台帳</button>
@@ -122,6 +122,16 @@
       </div>
       <div id="regMsg" style="margin-top:6px"></div>
       <div id="regList" style="margin-top:12px"></div>
+    </div>
+    </div>
+  </div>
+
+  <div id="history" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(20,30,45,.5);overflow:auto;padding:40px 16px" onclick="if(event.target===this)toggleHistory()">
+    <div class="card" style="max-width:900px;margin:0 auto;box-shadow:0 12px 40px rgba(0,0,0,.3)">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px">生成履歴（この端末に保存。「この内容を入力」で復元できます）
+      <button class="ghost" onclick="toggleHistory()" style="padding:1px 9px;font-size:16px;line-height:1.2" title="閉じる">×</button></h2>
+    <div class="body" style="max-height:76vh;overflow:auto">
+      <div id="histList"></div>
     </div>
     </div>
   </div>
@@ -258,12 +268,12 @@ function loadPreset(){
 const J={ok:'<span class="j ok">適合</span>',warn:'<span class="j warn">要確認</span>',
   req:'<span class="j req">要是正</span>',na:'<span class="j na">—</span>'};
 
-function generate(){
+function generate(record){
   const g=id=>document.getElementById(id).value;
   const youto=g("youto"),keikan=g("keikan"),senyou=g("senyou"),
     H=+g("height")||0,name=g("name")||"（物件名未入力）",addr=g("addr"),madoguchi=g("madoguchi")||"—";
   if(SIGNS.length===0){document.getElementById("output").innerHTML=
-    `<div class="hint" style="margin-top:16px">看板が未入力です。「丸亀製麺…を読込」または「＋看板を追加」で入力してください。</div>`;return;}
+    `<div class="hint" style="margin-top:16px">看板が未入力です。「＋看板を追加」で入力するか、「🕘 履歴」から過去の内容を読み込んでください。</div>`;return;}
 
   const grand=r2(SIGNS.reduce((a,s)=>a+areaTot(s),0));
   const exemptCap=KB.jikayoExempt(youto);
@@ -271,6 +281,13 @@ function generate(){
   const soryoCap=KB.wallAreaCap(youto);
   const hLimit=KB.wallHeightLimit(youto);
   const heightOK=H<=hLimit;
+
+  if(record){
+    const h=loadHist();
+    const sig=JSON.stringify({name,addr,total:grand,n:SIGNS.length});
+    const top=h[0]?JSON.stringify({name:h[0].name,addr:h[0].addr,total:h[0].total,n:(h[0].signs||[]).length}):null;
+    if(sig!==top){ h.unshift({ts:Date.now(),name,addr,youto,keikan,senyou,madoguchi,height:H,signs:SIGNS.map(s=>({...s})),total:grand,needApply}); saveHist(h); }
+  }
 
   const usedWalls=[...new Set(SIGNS.map(s=>s.wall))].filter(w=>WALL_BASE[w]);
   const wallRows=usedWalls.map(wk=>{
@@ -444,6 +461,49 @@ async function submitReg(){
     }else{const t=await r.text();msg.innerHTML=`<div class="srcnote">登録に失敗（${r.status}）：${t.slice(0,140)}</div>`;}
   }catch(e){msg.innerHTML=`<div class="srcnote">登録に失敗（ネットワーク）</div>`;}
 }
+
+/* ===== 生成履歴（この端末のブラウザに保存） ===== */
+const HKEY="jorei_history_v1";
+function loadHist(){try{return JSON.parse(localStorage.getItem(HKEY))||[];}catch(e){return[];}}
+function saveHist(a){try{localStorage.setItem(HKEY,JSON.stringify(a.slice(0,50)));}catch(e){}}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function toggleHistory(){
+  const el=document.getElementById("history");
+  const show=el.style.display==="none"||!el.style.display;
+  el.style.display=show?"block":"none";
+  if(show)renderHistory();
+}
+function openHistory(){toggleHistory();}
+function renderHistory(){
+  const el=document.getElementById("histList");
+  const h=loadHist();
+  if(!h.length){
+    el.innerHTML=`<div class="foot" style="border-top:none">まだ履歴がありません。物件情報と看板を入力して「条例調査表を生成」を押すと、ここに保存されます。<br>
+      <button class="ghost" style="margin-top:8px;font-size:12.5px;padding:6px 12px" onclick="loadPreset();toggleHistory();">丸亀製麺 新宿御苑前店のサンプルを読み込む</button></div>`;
+    return;
+  }
+  const rows=h.map((e,i)=>`<tr>
+    <td style="white-space:nowrap">${new Date(e.ts).toLocaleString("ja-JP")}</td>
+    <td>${esc(e.name)}<div class="src">${esc(e.addr)}</div></td>
+    <td class="amt">${e.total}㎡</td>
+    <td>${e.needApply?'<span class="j req">申請要</span>':'<span class="j ok">不要</span>'}</td>
+    <td style="white-space:nowrap"><button class="ghost" style="font-size:12px;padding:4px 10px" onclick="loadHistoryEntry(${i})">この内容を入力</button>
+      <button class="delrow" title="削除" onclick="delHistoryEntry(${i})">×</button></td></tr>`).join("");
+  el.innerHTML=`<table><tr class="secttl"><td style="width:140px">生成日時</td><td>物件名 / 住所</td><td style="width:90px">合計面積</td><td style="width:80px">判定</td><td style="width:180px">操作</td></tr>${rows}</table>
+    <div class="foot" style="border-top:none">${h.length} 件（この端末のブラウザに保存。サーバーには送信されません）。
+      <button class="ghost" style="margin-left:8px;font-size:11.5px;padding:3px 9px" onclick="clearHistory()">履歴を全消去</button></div>`;
+}
+function loadHistoryEntry(i){
+  const e=loadHist()[i]; if(!e)return;
+  const set=(id,v)=>{const el=document.getElementById(id); if(el)el.value=v;};
+  set("name",e.name||"");set("addr",e.addr||"");set("youto",e.youto||"商業地域");
+  set("height",e.height!=null?e.height:9);set("keikan",e.keikan||"該当なし");
+  set("senyou",e.senyou||"該当なし");set("madoguchi",e.madoguchi||"");
+  SIGNS=(e.signs||[]).map(s=>({...s}));
+  toggleHistory(); drawSigns(); generate();
+}
+function delHistoryEntry(i){const h=loadHist();h.splice(i,1);saveHist(h);renderHistory();}
+function clearHistory(){ if(confirm("履歴をすべて消去しますか？")){ saveHist([]); renderHistory(); } }
 drawSigns();
 </script>
 </body>
