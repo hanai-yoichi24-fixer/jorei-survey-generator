@@ -500,7 +500,8 @@ function loadHistoryEntry(i){
   set("height",e.height!=null?e.height:9);set("keikan",e.keikan||"該当なし");
   set("senyou",e.senyou||"該当なし");set("madoguchi",e.madoguchi||"");
   SIGNS=(e.signs||[]).map(s=>({...s}));
-  toggleHistory(); drawSigns(); generate();
+  toggleHistory(); drawSigns();
+  document.getElementById("output").innerHTML="";  // 入力のみ復元。生成は「生成」ボタンで
 }
 function delHistoryEntry(i){const h=loadHist();h.splice(i,1);saveHist(h);renderHistory();}
 function clearHistory(){ if(confirm("履歴をすべて消去しますか？")){ saveHist([]); renderHistory(); } }
