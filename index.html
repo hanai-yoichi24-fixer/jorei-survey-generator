@@ -93,9 +93,11 @@
     <button class="ghost" onclick="toggleRegistry()">📚 資料台帳</button>
   </div>
 
-  <div id="registry" class="card" style="display:none;margin-bottom:16px">
-    <h2>資料台帳（登録するとシステムに保存され、住所判定で自動参照されます）</h2>
-    <div class="body">
+  <div id="registry" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(20,30,45,.5);overflow:auto;padding:40px 16px" onclick="if(event.target===this)toggleRegistry()">
+    <div class="card" style="max-width:840px;margin:0 auto;box-shadow:0 12px 40px rgba(0,0,0,.3)">
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px">資料台帳（登録するとシステムに保存され、住所判定で自動参照されます）
+      <button class="ghost" onclick="toggleRegistry()" style="padding:1px 9px;font-size:16px;line-height:1.2" title="閉じる">×</button></h2>
+    <div class="body" style="max-height:76vh;overflow:auto">
       <div class="row" style="flex-wrap:wrap;gap:8px">
         <div style="min-width:120px"><label class="f">都道府県<span class="req-mark">必須</span></label><input id="r_pref" placeholder="例）東京都"></div>
         <div style="min-width:130px"><label class="f">市区町村</label><input id="r_muni" placeholder="例）渋谷区（都全域は空欄）"></div>
@@ -120,6 +122,7 @@
       </div>
       <div id="regMsg" style="margin-top:6px"></div>
       <div id="regList" style="margin-top:12px"></div>
+    </div>
     </div>
   </div>
 
