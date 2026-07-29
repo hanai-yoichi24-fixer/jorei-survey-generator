@@ -284,9 +284,8 @@ function generate(record){
 
   if(record){
     const h=loadHist();
-    const sig=JSON.stringify({name,addr,total:grand,n:SIGNS.length});
-    const top=h[0]?JSON.stringify({name:h[0].name,addr:h[0].addr,total:h[0].total,n:(h[0].signs||[]).length}):null;
-    if(sig!==top){ h.unshift({ts:Date.now(),name,addr,youto,keikan,senyou,madoguchi,height:H,signs:SIGNS.map(s=>({...s})),total:grand,needApply}); saveHist(h); }
+    h.unshift({ts:Date.now(),name,addr,youto,keikan,senyou,madoguchi,height:H,signs:SIGNS.map(s=>({...s})),total:grand,needApply});
+    saveHist(h);
   }
 
   const usedWalls=[...new Set(SIGNS.map(s=>s.wall))].filter(w=>WALL_BASE[w]);
