@@ -69,7 +69,7 @@
   .srcnote{font-size:11px;color:var(--warn);margin-top:4px;}
   @media(max-width:900px){.grid{grid-template-columns:1fr;}}
   @media print{
-    body{background:#fff;}.toolbar,.hint,header.top .tag,.card.input-col,.legend{display:none!important;}
+    body{background:#fff;}.toolbar,.hint,header.top .tag,.card.input-col,.legend,#registry{display:none!important;}
     .grid{grid-template-columns:1fr;}.app{max-width:none;padding:0;}
     header.top{background:#fff;color:#000;border:none;padding:0 0 8px;}
     .survey{border:none;}
@@ -91,6 +91,37 @@
     <button class="ghost" onclick="addSign()">＋ 看板を追加</button>
     <button class="ghost" onclick="window.print()">🖶 印刷 / PDF保存</button>
     <button class="ghost" onclick="clearAll()">クリア</button>
+    <button class="ghost" onclick="toggleRegistry()">📚 資料台帳</button>
+  </div>
+
+  <div id="registry" class="card" style="display:none;margin-bottom:16px">
+    <h2>資料台帳（登録するとシステムに保存され、住所判定で自動参照されます）</h2>
+    <div class="body">
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        <div style="min-width:120px"><label class="f">都道府県<span class="req-mark">必須</span></label><input id="r_pref" placeholder="例）東京都"></div>
+        <div style="min-width:130px"><label class="f">市区町村</label><input id="r_muni" placeholder="例）渋谷区（都全域は空欄）"></div>
+        <div style="min-width:160px"><label class="f">区分（適用範囲）<span class="req-mark">必須</span></label>
+          <select id="r_scope">
+            <option value="pref">都道府県全域（しおり相当）</option>
+            <option value="ward">区の条例</option>
+            <option value="core_city">中核市/独自条例市</option>
+            <option value="muni" selected>市区町村</option>
+          </select></div>
+        <div style="min-width:150px"><label class="f">区分名<span class="req-mark">必須</span></label><input id="r_cat" placeholder="例）景観（区条例）"></div>
+      </div>
+      <label class="f">資料名<span class="req-mark">必須</span></label><input id="r_name" placeholder="例）〇〇区景観条例のしおり">
+      <div class="row" style="flex-wrap:wrap;gap:8px">
+        <div><label class="f">発行主体</label><input id="r_issuer" placeholder="例）〇〇区 景観課"></div>
+        <div><label class="f">公開URL</label><input id="r_url" placeholder="https://…（PDF等）"></div>
+      </div>
+      <label class="f">主な参照箇所</label><input id="r_refs" placeholder="例）区域区分・事前協議・面積/高さ基準">
+      <div style="margin-top:10px">
+        <button class="primary" onclick="submitReg()">＋ 台帳に登録</button>
+        <button class="ghost" onclick="toggleRegistry()">閉じる</button>
+      </div>
+      <div id="regMsg" style="margin-top:6px"></div>
+      <div id="regList" style="margin-top:12px"></div>
+    </div>
   </div>
 
   <div class="hint">
@@ -346,7 +377,7 @@ function srcTable(list,live,meta){
   }).join("");
   const when=live&&meta&&meta.fetchedAt?new Date(meta.fetchedAt).toLocaleString("ja-JP"):"";
   const head=live?`実際にWebから取得して存在を確認しました（${when}）`:`オフライン表示（リンクのみ）。存在確認は公開URL上で実行されます`;
-  const gap=list.some(s=>!s.url)?`<div class="srcnote">※「未登録」は当ツールにまだ登録がない資料です。この自治体を扱うには、該当条例・しおり相当文書の登録が必要です（自治体差分は設計フェーズ）。</div>`:"";
+  const gap=list.some(s=>!s.url)?`<div class="srcnote">※「未登録」は当ツールにまだ登録がない資料です。この自治体を扱うには、該当条例・しおり相当文書の登録が必要です（資料台帳から登録できます）。</div>`:"";
   return `<table><tr class="secttl"><td style="width:130px">区分</td><td>資料名 / 発行主体</td><td>主な参照箇所</td><td style="width:120px">取得状況</td></tr>${rows}</table>
     <div class="foot" style="border-top:none">${head}。規制値そのものの自動抽出（LLM）は次段階（要APIキー・人的検証）で、現在の判定は登録済み基準に基づきます。${gap}</div>`;
 }
@@ -372,6 +403,41 @@ async function loadSources(p){
   try{const r=await fetch("/api/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});if(r.ok)data=await r.json();}catch(e){}
   if(data&&data.sources)el.innerHTML=srcTable(data.sources,true,data);
   else el.innerHTML=srcTable(resolveSourcesClient(p),false);
+}
+
+function toggleRegistry(){
+  const el=document.getElementById("registry");
+  const show=el.style.display==="none"||!el.style.display;
+  el.style.display=show?"block":"none";
+  if(show)loadRegList();
+}
+async function loadRegList(){
+  const el=document.getElementById("regList");el.innerHTML=`<div class="foot" style="border-top:none">読み込み中…</div>`;
+  try{
+    const r=await fetch("/api/registry");const d=await r.json();
+    const list=d.sources||[];
+    const rows=list.map(s=>`<tr><td>${(s.pref||"")+" "+(s.muni||"")}</td><td>${s.category||""}</td>
+      <td>${s.url?`<a class="srclink" href="${s.url}" target="_blank" rel="noopener">${s.name}</a>`:s.name}<div class="src">${s.issuer||""}</div></td>
+      <td>${s.refs||""}</td></tr>`).join("");
+    el.innerHTML=`<table><tr class="secttl"><td style="width:150px">自治体</td><td style="width:140px">区分</td><td>資料名 / 発行主体</td><td>参照箇所</td></tr>
+      ${rows||`<tr><td colspan="4" class="foot" style="border-top:none">登録がありません</td></tr>`}</table>
+      <div class="foot" style="border-top:none">登録済み ${list.length} 件。ここに登録した資料は、住所の自治体が一致したとき出典として自動参照されます。</div>`;
+  }catch(e){ el.innerHTML=`<div class="foot" style="border-top:none">一覧を取得できませんでした（公開URL上で動作します）</div>`; }
+}
+async function submitReg(){
+  const v=id=>document.getElementById(id).value.trim();
+  const payload={pref:v("r_pref"),muni:v("r_muni"),scope:v("r_scope"),category:v("r_cat"),name:v("r_name"),issuer:v("r_issuer"),url:v("r_url"),refs:v("r_refs")};
+  const msg=document.getElementById("regMsg");
+  if(!payload.pref||!payload.category||!payload.name){msg.innerHTML=`<div class="srcnote">都道府県・区分名・資料名は必須です</div>`;return;}
+  msg.innerHTML=`<div class="foot" style="border-top:none">登録中…</div>`;
+  try{
+    const r=await fetch("/api/registry",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    if(r.ok){
+      msg.innerHTML=`<div class="foot" style="border-top:none;color:var(--ok)">登録しました。住所判定で参照されます。</div>`;
+      ["r_muni","r_cat","r_name","r_issuer","r_url","r_refs"].forEach(id=>document.getElementById(id).value="");
+      loadRegList();
+    }else{const t=await r.text();msg.innerHTML=`<div class="srcnote">登録に失敗（${r.status}）：${t.slice(0,140)}</div>`;}
+  }catch(e){msg.innerHTML=`<div class="srcnote">登録に失敗（ネットワーク）</div>`;}
 }
 drawSigns();
 </script>
