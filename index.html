@@ -67,9 +67,18 @@
   .st.err{background:var(--reqbg);color:var(--req);}
   .srclink{color:#1a6fbf;word-break:break-all;}
   .srcnote{font-size:11px;color:var(--warn);margin-top:4px;}
+  .steps{display:flex;gap:10px;margin:14px 15px 4px;flex-wrap:wrap;}
+  .step2{flex:1;min-width:230px;border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:#fafbfc;display:flex;gap:10px;align-items:flex-start;}
+  .step2 .num{width:22px;height:22px;border-radius:50%;background:#c4ced8;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;flex:0 0 auto;}
+  .step2.run .num{background:var(--navy2);}
+  .step2.done .num{background:var(--ok);}
+  .step2 .t{font-size:12.5px;font-weight:bold;color:var(--navy);}
+  .step2 .s{font-size:11px;color:var(--muted);margin-top:2px;}
+  .spin{display:inline-block;width:11px;height:11px;border:2px solid #c4ced8;border-top-color:var(--navy2);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
   @media(max-width:900px){.grid{grid-template-columns:1fr;}}
   @media print{
-    body{background:#fff;}.toolbar,.hint,header.top .tag,.card.input-col,.legend,#registry,#history{display:none!important;}
+    body{background:#fff;}.toolbar,.hint,header.top .tag,.card.input-col,.legend,#registry,#history,.steps{display:none!important;}
     .grid{grid-template-columns:1fr;}.app{max-width:none;padding:0;}
     header.top{background:#fff;color:#000;border:none;padding:0 0 8px;}
     .survey{border:none;}
@@ -268,7 +277,7 @@ function loadPreset(){
 const J={ok:'<span class="j ok">適合</span>',warn:'<span class="j warn">要確認</span>',
   req:'<span class="j req">要是正</span>',na:'<span class="j na">—</span>'};
 
-function generate(record){
+async function generate(record){
   const g=id=>document.getElementById(id).value;
   const youto=g("youto"),keikan=g("keikan"),senyou=g("senyou"),
     H=+g("height")||0,name=g("name")||"（物件名未入力）",addr=g("addr"),madoguchi=g("madoguchi")||"—";
@@ -367,22 +376,40 @@ function generate(record){
         <td>${needApply?'<span class="j req">適用除外(10㎡)超</span>':J.ok}</td></tr>
   </table>`;
 
-  const bodyHtml=`<div class="hd sub" style="margin-top:0">■ 照合に使った情報ソース（住所から自動取得）</div>
-    <div id="srcPanel"><table><tr><td class="foot" style="border-top:none">住所から適用資料を判定し、取得中…</td></tr></table></div>
-    ${meta}${kyotsu}${kob}
-    <div class="hd sub">■ 面積計算表（実測寸法から自動算定）</div>${areaTable}`;
-  const cnt=c=>(bodyHtml.match(new RegExp('class="j '+c+'"','g'))||[]).length;
-
+  // ---- 処理順が見える骨組み（①ソース取得 → ②照合）----
   document.getElementById("output").innerHTML=`
     <div class="survey" style="margin-top:16px">
       <div class="hd">【条例調査表】${name}　<span style="font-weight:normal;font-size:12px;opacity:.85">自動生成ドラフト（要人的レビュー）</span></div>
-      ${bodyHtml}
-      <div class="foot">
-        自動判定：適合 ${cnt('ok')} 件／要確認 ${cnt('warn')} 件／要是正 ${cnt('req')} 件。
-        「要確認」は行政・現地確認を人が行う箇所です。本ドラフトは各法令の最終確認を前提とします。
+      <div class="steps">
+        <div class="step2" id="stp1"><div class="num">1</div><div><div class="t">情報ソースを取得</div><div class="s" id="stp1s">待機中…</div></div></div>
+        <div class="step2" id="stp2"><div class="num">2</div><div><div class="t">取得したソースで照合</div><div class="s" id="stp2s">待機中…</div></div></div>
       </div>
+      <div class="hd sub" style="margin-top:0">■ 照合に使った情報ソース（住所から自動取得）</div>
+      <div id="srcPanel"><div class="foot" style="border-top:none">—</div></div>
+      <div id="matchPanel"></div>
     </div>`;
-  loadSources({addr:addr,youto:youto,keikan:keikan,senyou:senyou});
+
+  // ---- STEP 1: 情報ソースを取得 ----
+  setStep(1,"run","住所から適用資料を特定し、Webで取得中…");
+  await delay(450);
+  const sr=await fetchSourcesData({addr,youto,keikan,senyou});
+  document.getElementById("srcPanel").innerHTML=srcTable(sr.list,sr.live,sr.meta);
+  const srcNames=sr.list.filter(s=>s.category!=="—").map(s=>s.name);
+  setStep(1,"done","取得完了："+(srcNames.length?srcNames.join(" ／ "):"（該当資料）"));
+
+  // ---- STEP 2: 取得したソースで照合 ----
+  setStep(2,"run","取得したソースの基準に照らして照合中…");
+  await delay(600);
+  const matchBody=`<div class="src" style="padding:2px 15px 8px">参照ソースに基づき照合：${esc(srcNames.join("、")||"—")}</div>
+    ${meta}${kyotsu}${kob}
+    <div class="hd sub">■ 面積計算表（実測寸法から自動算定）</div>${areaTable}`;
+  const cnt=c=>(matchBody.match(new RegExp('class="j '+c+'"','g'))||[]).length;
+  document.getElementById("matchPanel").innerHTML=`${matchBody}
+    <div class="foot">
+      自動判定：適合 ${cnt('ok')} 件／要確認 ${cnt('warn')} 件／要是正 ${cnt('req')} 件。
+      「要確認」は行政・現地確認を人が行う箇所です。本ドラフトは各法令の最終確認を前提とします。
+    </div>`;
+  setStep(2,"done","照合完了");
 }
 
 function statusCls(s){if(/OK/.test(s))return"ok";if(/不可|失敗/.test(s))return"err";return"warn";}
@@ -416,12 +443,18 @@ function resolveSourcesClient(p){
   if(senyou&&senyou!=="該当なし")out.push({category:"道路占用",name:"道路占用許可（道路管理者）",issuer:(muni||"所管自治体")+" 道路管理担当",url:null,refs:"袖看板等が道路を占用する場合。窓口確認が必要"});
   return out;
 }
-async function loadSources(p){
-  const el=document.getElementById("srcPanel");if(!el)return;
-  let data=null;
-  try{const r=await fetch("/api/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});if(r.ok)data=await r.json();}catch(e){}
-  if(data&&data.sources)el.innerHTML=srcTable(data.sources,true,data);
-  else el.innerHTML=srcTable(resolveSourcesClient(p),false);
+async function fetchSourcesData(p){
+  try{
+    const r=await fetch("/api/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});
+    if(r.ok){const d=await r.json(); return {list:d.sources||[],live:true,meta:d};}
+  }catch(e){}
+  return {list:resolveSourcesClient(p),live:false,meta:null};
+}
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+function setStep(n,state,msg){
+  const box=document.getElementById("stp"+n); if(box){box.classList.remove("run","done"); if(state)box.classList.add(state);}
+  const s=document.getElementById("stp"+n+"s");
+  if(s)s.innerHTML=(state==="run"?'<span class="spin"></span> ':'')+(msg||"");
 }
 
 function toggleRegistry(){
