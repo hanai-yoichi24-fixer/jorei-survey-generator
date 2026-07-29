@@ -128,7 +128,7 @@
 
   <div id="history" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(20,30,45,.5);overflow:auto;padding:40px 16px" onclick="if(event.target===this)toggleHistory()">
     <div class="card" style="max-width:900px;margin:0 auto;box-shadow:0 12px 40px rgba(0,0,0,.3)">
-    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px">生成履歴（この端末に保存。「この内容を入力」で復元できます）
+    <h2 style="display:flex;justify-content:space-between;align-items:center;gap:8px">生成履歴（サーバーに保存。「この内容を入力」で復元できます）
       <button class="ghost" onclick="toggleHistory()" style="padding:1px 9px;font-size:16px;line-height:1.2" title="閉じる">×</button></h2>
     <div class="body" style="max-height:76vh;overflow:auto">
       <div id="histList"></div>
@@ -138,7 +138,7 @@
 
   <div class="hint">
     規制値は<b>東京都屋外広告物のしおり（2025年）</b>および<b>新宿区景観まちづくり条例の手引き（R5）</b>に基づきます。
-    入力データはこのブラウザ内だけで処理され、サーバーには送信・保存されません（社外秘データの取り扱いに配慮）。
+    判定はこのブラウザ内で計算します。生成した調査表の履歴（物件情報・看板）はサーバー（データベース）に保存され、別の端末からも参照できます。
     <b>「要確認」＝公開文書だけでは決まらず、行政・現地確認を人が行う箇所</b>です。判定はドラフトであり、最終確認は各法令をご参照ください。
   </div>
 
@@ -283,9 +283,7 @@ function generate(record){
   const heightOK=H<=hLimit;
 
   if(record){
-    const h=loadHist();
-    h.unshift({ts:Date.now(),name,addr,youto,keikan,senyou,madoguchi,height:H,signs:SIGNS.map(s=>({...s})),total:grand,needApply});
-    saveHist(h);
+    saveHistoryServer({name,addr,youto,keikan,senyou,madoguchi,height:H,signs:SIGNS.map(s=>({...s})),total:grand,needApply});
   }
 
   const usedWalls=[...new Set(SIGNS.map(s=>s.wall))].filter(w=>WALL_BASE[w]);
@@ -461,11 +459,12 @@ async function submitReg(){
   }catch(e){msg.innerHTML=`<div class="srcnote">登録に失敗（ネットワーク）</div>`;}
 }
 
-/* ===== 生成履歴（この端末のブラウザに保存） ===== */
-const HKEY="jorei_history_v1";
-function loadHist(){try{return JSON.parse(localStorage.getItem(HKEY))||[];}catch(e){return[];}}
-function saveHist(a){try{localStorage.setItem(HKEY,JSON.stringify(a.slice(0,50)));}catch(e){}}
+/* ===== 生成履歴（サーバー保存：Supabase jorei_history） ===== */
+let HIST_CACHE=[];
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function saveHistoryServer(snap){
+  fetch("/api/history",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(snap)}).catch(()=>{});
+}
 function toggleHistory(){
   const el=document.getElementById("history");
   const show=el.style.display==="none"||!el.style.display;
@@ -473,27 +472,31 @@ function toggleHistory(){
   if(show)renderHistory();
 }
 function openHistory(){toggleHistory();}
-function renderHistory(){
+async function renderHistory(){
   const el=document.getElementById("histList");
-  const h=loadHist();
-  if(!h.length){
-    el.innerHTML=`<div class="foot" style="border-top:none">まだ履歴がありません。物件情報と看板を入力して「条例調査表を生成」を押すと、ここに保存されます。<br>
+  el.innerHTML=`<div class="foot" style="border-top:none">読み込み中…</div>`;
+  let items=[];
+  try{ const r=await fetch("/api/history"); const d=await r.json(); items=d.items||[]; }
+  catch(e){ el.innerHTML=`<div class="foot" style="border-top:none">履歴を取得できませんでした（公開URL上で動作します）</div>`; return; }
+  HIST_CACHE=items;
+  if(!items.length){
+    el.innerHTML=`<div class="foot" style="border-top:none">まだ履歴がありません。物件情報と看板を入力して「条例調査表を生成」を押すと、サーバーに保存されます。<br>
       <button class="ghost" style="margin-top:8px;font-size:12.5px;padding:6px 12px" onclick="loadPreset();toggleHistory();">丸亀製麺 新宿御苑前店のサンプルを読み込む</button></div>`;
     return;
   }
-  const rows=h.map((e,i)=>`<tr>
-    <td style="white-space:nowrap">${new Date(e.ts).toLocaleString("ja-JP")}</td>
+  const rows=items.map((e,i)=>`<tr>
+    <td style="white-space:nowrap">${e.created_at?new Date(e.created_at).toLocaleString("ja-JP"):""}</td>
     <td>${esc(e.name)}<div class="src">${esc(e.addr)}</div></td>
-    <td class="amt">${e.total}㎡</td>
-    <td>${e.needApply?'<span class="j req">申請要</span>':'<span class="j ok">不要</span>'}</td>
+    <td class="amt">${e.total!=null?e.total+"㎡":""}</td>
+    <td>${e.need_apply?'<span class="j req">申請要</span>':'<span class="j ok">不要</span>'}</td>
     <td style="white-space:nowrap"><button class="ghost" style="font-size:12px;padding:4px 10px" onclick="loadHistoryEntry(${i})">この内容を入力</button>
       <button class="delrow" title="削除" onclick="delHistoryEntry(${i})">×</button></td></tr>`).join("");
   el.innerHTML=`<table><tr class="secttl"><td style="width:140px">生成日時</td><td>物件名 / 住所</td><td style="width:90px">合計面積</td><td style="width:80px">判定</td><td style="width:180px">操作</td></tr>${rows}</table>
-    <div class="foot" style="border-top:none">${h.length} 件（この端末のブラウザに保存。サーバーには送信されません）。
+    <div class="foot" style="border-top:none">${items.length} 件（サーバーに保存。どの端末からも参照できます）。
       <button class="ghost" style="margin-left:8px;font-size:11.5px;padding:3px 9px" onclick="clearHistory()">履歴を全消去</button></div>`;
 }
 function loadHistoryEntry(i){
-  const e=loadHist()[i]; if(!e)return;
+  const e=HIST_CACHE[i]; if(!e)return;
   const set=(id,v)=>{const el=document.getElementById(id); if(el)el.value=v;};
   set("name",e.name||"");set("addr",e.addr||"");set("youto",e.youto||"商業地域");
   set("height",e.height!=null?e.height:9);set("keikan",e.keikan||"該当なし");
@@ -502,8 +505,16 @@ function loadHistoryEntry(i){
   toggleHistory(); drawSigns();
   document.getElementById("output").innerHTML="";  // 入力のみ復元。生成は「生成」ボタンで
 }
-function delHistoryEntry(i){const h=loadHist();h.splice(i,1);saveHist(h);renderHistory();}
-function clearHistory(){ if(confirm("履歴をすべて消去しますか？")){ saveHist([]); renderHistory(); } }
+async function delHistoryEntry(i){
+  const e=HIST_CACHE[i]; if(!e)return;
+  try{ await fetch("/api/history?id="+encodeURIComponent(e.id),{method:"DELETE"}); }catch(_){}
+  renderHistory();
+}
+async function clearHistory(){
+  if(!confirm("履歴をすべて消去しますか？"))return;
+  try{ await fetch("/api/history?all=1",{method:"DELETE"}); }catch(_){}
+  renderHistory();
+}
 drawSigns();
 </script>
 </body>
